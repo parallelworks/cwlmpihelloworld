@@ -26,3 +26,12 @@ This workflow runs an **MPI Hello World** program using **CWL** on a **SLURM clu
 - **Generate SLURM Script**: Prepares the batch script.
 - **Submit Job**: Submits the job to SLURM.
 - **Wait for Completion**: Monitors job execution.
+
+The output of the workflow is written to ` ~/pw/jobs/<workflow-name>/<job-number>/cwl_workflow/slurm-output/mpitest.out`:
+
+```
+Hello world from processor alvaro-gcprockyv3-00114-1-0002, rank 3 out of 4 processors
+Hello world from processor alvaro-gcprockyv3-00114-1-0001, rank 1 out of 4 processors
+Hello world from processor alvaro-gcprockyv3-00114-1-0002, rank 2 out of 4 processors
+Hello world from processor alvaro-gcprockyv3-00114-1-0001, rank 0 out of 4 processors
+```
