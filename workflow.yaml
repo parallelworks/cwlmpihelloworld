@@ -1,0 +1,109 @@
+jobs:
+  install_intel_mpi:
+    steps:
+      - name: Install Intel-OneAPI-MPI
+        if: ${{ inputs.install_mpi }}
+        run: ssh -o StrictHostKeyChecking=no ${{ inputs.resource.ip }} 'bash -s' < ./install_intel_mpi_with_spack.sh
+  install_cwltool:
+    steps:
+      - name: Install cwltool
+        if: ${{ inputs.install_cwl }}
+        run: ssh -o StrictHostKeyChecking=no ${{ inputs.resource.ip }} 'bash -s' < ./install_cwltool_with_miniconda.sh
+  run_cwl:
+    needs:
+      - install_intel_mpi
+      - install_cwltool
+    steps:
+      - name: Create CWL Input File
+        run: |
+          source inputs.sh
+          cat > cwl_workflow/inputs.yaml <<HERE
+          load_mpi: "source /home/alvaro/pw/software/load-intel-oneapi-mpi.sh"
+          np: 4
+          scheduler_directives: "${scheduler_directives}"
+          source_code:
+            class: File
+            path: "mpitest.c"
+          wait_script:
+            class: File
+            path: "wait_for_slurm_job.sh"
+          output_dir:
+            class: Directory
+            path: "./slurm-output"
+          HERE
+          cat cwl_workflow/inputs.yaml
+      - name: Transfer files
+        run: |
+          job_number=$(basename ${PWD})
+          workflow_name=$(basename $(dirname ${PWD}))
+          remote_home_dir=$(ssh -o StrictHostKeyChecking=no ${{ inputs.resource.ip }} pwd)
+          resource_jobdir=${remote_home_dir}/pw/jobs/${workflow_name}/${job_number}
+          echo "resource_jobdir=${resource_jobdir}"  | tee -a $OUTPUTS
+          rsync  -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" -avzq --rsync-path="mkdir -p ${resource_jobdir} && rsync" ${PWD}/cwl_workflow/ ${{ inputs.resource.ip }}:${resource_jobdir}/cwl_workflow
+      - name: Run CWL Workflow
+        run: |
+          resource_jobdir="${{ needs.run_cwl.outputs.resource_jobdir }}"
+          cat > run_cwl.sh <<HERE
+          ${{ inputs.load_cwltool }}
+          cd ${resource_jobdir}/cwl_workflow
+          mkdir slurm-output
+          cwltool --tmpdir-prefix ~/tmp/ --leave-tmpdir mpi_workflow.cwl inputs.yaml
+          HERE
+
+          cat run_cwl.sh
+          ssh -o StrictHostKeyChecking=no ${{ inputs.resource.ip }} 'bash -s' < run_cwl.sh
+'on':
+  execute:
+    inputs:
+      install_mpi:
+        label: Install Intel-OneAPI-MPI?
+        type: boolean
+        default: true
+        tooltip: If yes is selected, the job install intel-oneapi-mpi. Otherwise, you must provide a command to load MPI.
+      load_mpi:
+        label: Command to load MPI
+        type: string
+        hidden: ${{ inputs.install_mpi }}
+        optional: ${{ .hidden }}
+        default: ${{ .hidden && "source ~/pw/software/load-intel-oneapi-mpi.sh" || "" }}
+        tooltip: 'To load the MPI environment, enter the appropriate command, for example: module load module-name or source path/to/env.sh.'
+      install_cwltool:
+        label: Install CWL Tool?
+        type: boolean
+        default: true
+        tooltip: If yes is selected, the job install cwltool under the latest miniconda environment.
+      load_cwltool:
+        label: Command to load CWL Tool
+        type: string
+        hidden: ${{ inputs.install_cwltool }}
+        optional: ${{ .hidden }}
+        default: ${{ .hidden && "source ~/pw/software/miniconda3-cwltool/bin/activate" || "" }}
+        tooltip: 'To load the cwltool environment, enter the appropriate command, for example: module load module-name or source path/to/env.sh.'
+      np:
+        label: Number of Processes
+        type: number
+        min: 2
+        max: 100
+        default: 2
+        tooltip: Number of MPI processes
+      resource:
+        label: Resource
+        type: compute-clusters
+        tooltip: Choose the resource for script submission
+      scheduler_directives:
+        label: Type the scheduler directives
+        type: editor
+        default: |
+          #!/bin/bash
+          #SBATCH --ntasks-per-node=2
+          #SBATCH --nodes=2
+          #SBATCH --job-name=mpi-hello-world
+        optional: ${{.hidden}}
+      wait_for_job:
+        label: Wait for the PBS job or fire and forget?
+        type: boolean
+        hidden: true
+        default: true
+        ignore: ${{ .hidden }}
+        optional: ${{ .hidden }}
+        tooltip: If yes is selected, the PW job waits for the SLURM or PBS job to complete while continuously monitoring its status and the possibility to cancel the SLURM or PBS job when the PW job is canceled
