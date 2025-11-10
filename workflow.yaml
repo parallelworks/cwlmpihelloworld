@@ -90,6 +90,10 @@ jobs:
         label: Resource
         type: compute-clusters
         tooltip: Choose the resource for script submission
+        provider:
+          - aws-slurm
+          - google-slurm
+          - azure-slurm
       scheduler_directives:
         label: Type the scheduler directives
         type: editor
