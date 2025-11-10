@@ -12,7 +12,7 @@ cd pw/software
 git clone -c feature.manyFiles=true https://github.com/spack/spack.git
 . $HOME/pw/software/spack/share/spack/setup-env.sh
 spack install intel-oneapi-mpi intel-oneapi-compilers gcc-runtime
-source /usr/share/lmod/8.7.7/init/bash
+source /usr/share/lmod/lmod/init/bash
 yes | spack module lmod refresh gcc-runtime intel-oneapi-mpi intel-oneapi-compilers
 
 # Create file to load the environment
